@@ -1,83 +1,85 @@
 <!doctype html>
 <html>
 <head>
-    <title>Socket.IO chat</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font: 13px Helvetica, Arial; }
-        form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
-        form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
-        form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
-        #messages { list-style-type: none; margin: 0; padding: 0; }
-        #messages li { padding: 5px 10px; }
-        #messages li:nth-child(odd) { background: #eee; }
-    </style>
+	<title>Socket.IO chat</title>
+	<style>
+		* { margin: 0; padding: 0; box-sizing: border-box; }
+		body { font: 13px Helvetica, Arial; }
+		form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+		form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+		form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+		#messages { list-style-type: none; margin: 0; padding: 0; }
+		#messages li { padding: 5px 10px; }
+		#messages li:nth-child(odd) { background: #eee; }
+	</style>
 </head>
 <body>
-    <ul id="messages"></ul>
-    <form action="">
-        <input id="m" autocomplete="off" /><button>Send</button>
-    </form>
+	<ul id="messages"></ul>
+	<form action="">
+		<input id="m" autocomplete="off" /><button>Send</button>
+	</form>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
-    <script>
-        // connection 接続
-        var socket = io();
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="/msgpack.codec.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+	<script>
+		var obj = {
+			aaa: {
+				count: 123,
+				name: "テスト１",
+				result: false
+			},
+			bbb: {
+				count: 456,
+				name: "テスト２",
+				result: true
+			},
+			ccc: {
+				count: 789,
+				name: "テスト３",
+				param: {
+					ary: ["a", "b", "c"],
+					name: "テスト４"
+				},
+				result: true
+			}
+		};
 
-        $('form').submit(function () {
-            // emitメソッドでchatイベント実行、引き数はデータ
-            socket.emit('chat', $('#m').val());
-            $('#m').val('').focus();
-            return false;
-        });
 
-    	$('#m').focus();
+		// connection 接続
+		var socket = io();
 
-        // chatイベントを受信したときの処理
-        socket.on('chat', function (msg) {
-            $('#messages').append($('<li>').text(msg));
-        });
+		$('form').submit(function () {
+			// client send
+			//socket.emit('chat', $('#m').val());
+		    var json = JSON.stringify(obj);
+		    console.log(json);
+		    var binary = msgpack.pack(json);
+		    console.log(binary);
+		    socket.emit('chat', binary);
+			$('#m').val('').focus();
+			return false;
+		});
 
-        // socket connect
-        socket.on('connect', function () {
-            console.log('[socket connect]');
-        });
+		$('#m').focus();
 
-        // socket error
-        socket.on('error', function(err) {
-            console.log('[socket error]' + err);
-        });
+		// server push
+		socket.on('chat', function (data) {
+		    console.log(data);
+		    var unpack = msgpack.unpack(data);
+			console.log(unpack);
+			$('#messages').append($('<li>').text(unpack));
+		});
 
-        // socket disconnect
-        socket.on('disconnect', function () {
-            console.log('[socket disconnect]');
-        });
 
-        // socket reconnect
-        socket.on('reconnect', function (num) {
-            console.log('[socket reconnect]' + num);
-        });
-
-        // socket reconnect_attempt
-        socket.on('reconnect_attempt', function () {
-            console.log('[socket reconnect_attempt]');
-        });
-
-        // socket reconnecting
-        socket.on('reconnecting', function (num) {
-            console.log('[socket reconnecting]' + num);
-        });
-
-        // socket reconnect_error
-        socket.on('reconnect_error', function (err) {
-            console.log('[socket reconnect_error]' + err);
-        });
-
-        // socket reconnect_failed
-        socket.on('reconnect_failed', function () {
-            console.log('[socket reconnect_failed]');
-        });
-    </script>
+		socket.on('connect', function () { console.log('[connect]'); });
+		socket.on('error', function(err) { console.log('[error]' + err); });
+		socket.on('disconnect', function () { console.log('[disconnect]'); });
+		socket.on('reconnect', function (num) { console.log('[reconnect]' + num); });
+		socket.on('reconnect_attempt', function () { console.log('[reconnect_attempt]'); });
+		socket.on('reconnecting', function (num) { console.log('[reconnecting]' + num); });
+		socket.on('reconnect_error', function (err) { console.log('[reconnect_error]' + err); });
+		socket.on('reconnect_failed', function () { console.log('[reconnect_failed]'); });
+	</script>
 </body>
 </html>

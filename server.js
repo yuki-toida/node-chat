@@ -1,62 +1,94 @@
 var http = require('http');
 var server = http.createServer();
 var fs = require('fs');
+var url = require('url');
+var path = require('path');
 
-var html;
-fs.readFile('./index.html', function (err, data) {
-    if (err) {
-        throw err;
-    }
-    html = data;
-});
-
-// ip取得
-function getIpAdress(request) {
-    if (request.headers['x-forwarded-for']) {
-        return request.headers['x-forwarded-for'];
-    }
-    if (request.connection && request.connection.remoteAddress) {
-        return request.connection.remoteAddress;
-    }
-    if (request.connection.socket && request.connection.socket.remoteAddress) {
-        return request.connection.socket.remoteAddress;
-    }
-    if (request.socket && request.socket.remoteAddress) {
-        return request.socket.remoteAddress;
-    }
-    return '0.0.0.0';
+var message = {
+    200: 'OK',
+    404: 'Not Found',
+    500: 'Internal Server Error',
+    501: 'Not Implemented'
 };
 
-var ipAdress;
+var mime = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.txt': 'text/plain'
+};
 
-// requestイベント：リクエストを受け付けたときに発生
 server.on('request', function (req, res) {
-    ipAdress = getIpAdress(req);
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.write(html);
-    res.end();
-})
+    var pathName = url.parse(req.url).pathname;
+    var filePath = __dirname + pathName;
 
-var io = require('socket.io')(server);
-var redis = require('socket.io-redis');
-io.adapter(redis({ host: 'dev-cache01.clayapp.jp', port: 6383 }));
+    if (req.method != 'GET') return;
 
-/*
-    クライアント側のioオブジェクトでサーバーに接続
-    クライアント情報をふくむsocketオブジェクト作成
-    引き数にsocketオブジェクトを渡し、connectionイベントハンドラー実行
-    socketオブジェクトに対してchatイベントハンドラーを設定する
-    クライアントのemitメソッドによって渡されたデータを引き数にイベントハンドラー実行
-*/
-io.on('connection', function (socket) {
-    socket.on('chat', function (msg) {
-        io.emit('chat', '[' + ipAdress + '] ' + msg);
+    fs.stat(filePath, function (err, stats) {
+        if (err) return;
+
+        if (stats.isDirectory()) {
+            filePath = path.join(filePath, 'index.html');
+        }
+
+        var stream = fs.createReadStream(filePath);
+        stream.on('readable', function () {
+            res.writeHead(200, { 'Content-Type': mime[path.extname(filePath)] || 'text-plain' });
+        });
+        stream.on('data', function (chunk) { res.write(chunk); });
+        stream.on('close', function () { res.end(); });
+        stream.on('error', function (err) { return; });
     });
 });
 
-// 実行環境
-var host = process.env.NODE_ENV === 'production' ? '10.192.212.101' : 'localhost';
 
-server.listen(3000, host, function () {
-    console.log('listening on ' + host);
+var msgpack = require('msgpack');
+//var obj = {
+//    aaa: {
+//        count: 123,
+//        name: 'test1',
+//        result: false
+//    },
+//    bbb: {
+//        count: 456,
+//        name: 'test2',
+//        result: true
+//    },
+//    ccc: {
+//        count: 789,
+//        name: 'test3',
+//        param: {
+//            ary: ['a', 'b', 'c'],
+//            name: 'test4'
+//        },
+//        result: true
+//    }
+//};
+//var p = msgpack.pack(obj);
+//var up = msgpack.unpack(p);
+//console.log(p.length);
+//console.log(up.length);
+
+
+// socket.io
+var io = require('socket.io')(server);
+io.on('connection', function (socket) {
+    socket.on('chat', function (data) {
+        console.log(data);
+        var buf = new Buffer(data);
+        console.log(buf);
+        //var unpack = msgpack.unpack(data);
+        //console.log(unpack);
+        io.emit('chat', { buffer: buf });
+    });
+});
+
+var host = process.env.NODE_ENV === 'production' ? '10.192.212.101' : 'localhost';
+var port = 3000;
+
+server.listen(port, host, function () {
+    console.log('listening on ' + host + ':' + port);
 });
