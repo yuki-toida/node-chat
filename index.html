@@ -54,8 +54,10 @@
 			//socket.emit('chat', $('#m').val());
 		    var json = JSON.stringify(obj);
 		    console.log(json);
+		    console.log(json.length);
 		    var binary = msgpack.pack(json);
 		    console.log(binary);
+		    console.log(binary.length);
 		    socket.emit('chat', binary);
 			$('#m').val('').focus();
 			return false;
