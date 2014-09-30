@@ -3,6 +3,8 @@ var server = http.createServer();
 var fs = require('fs');
 var url = require('url');
 var path = require('path');
+var io = require('socket.io')(server);
+var msgpack = require('msgpack');
 
 var message = {
     200: 'OK',
@@ -44,46 +46,18 @@ server.on('request', function (req, res) {
     });
 });
 
-
-var msgpack = require('msgpack');
-//var obj = {
-//    aaa: {
-//        count: 123,
-//        name: 'test1',
-//        result: false
-//    },
-//    bbb: {
-//        count: 456,
-//        name: 'test2',
-//        result: true
-//    },
-//    ccc: {
-//        count: 789,
-//        name: 'test3',
-//        param: {
-//            ary: ['a', 'b', 'c'],
-//            name: 'test4'
-//        },
-//        result: true
-//    }
-//};
-//var p = msgpack.pack(obj);
-//var up = msgpack.unpack(p);
-//console.log(p.length);
-//console.log(up.length);
-
-
 // socket.io
-var io = require('socket.io')(server);
 io.on('connection', function (socket) {
     socket.on('chat', function (data) {
-        console.log(data);
-        var buf = new Buffer(data);
-        console.log(buf);
-        //var unpack = msgpack.unpack(data);
-        //console.log(unpack);
-        io.emit('chat', { buffer: buf });
+        //console.log(data);
+        io.emit('chat', data);
     });
+
+    socket.on('binary', function(data) {
+        //console.log(msgpack.unpack(data));
+        //console.log(data);
+        io.emit('binary', { buffer: data });
+    })
 });
 
 var host = process.env.NODE_ENV === 'production' ? '10.192.212.101' : 'localhost';

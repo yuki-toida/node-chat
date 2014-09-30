@@ -1,87 +1,92 @@
 <!doctype html>
 <html>
 <head>
-	<title>Socket.IO chat</title>
-	<style>
-		* { margin: 0; padding: 0; box-sizing: border-box; }
-		body { font: 13px Helvetica, Arial; }
-		form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
-		form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
-		form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
-		#messages { list-style-type: none; margin: 0; padding: 0; }
-		#messages li { padding: 5px 10px; }
-		#messages li:nth-child(odd) { background: #eee; }
-	</style>
+    <title>socket.io chat</title>
 </head>
 <body>
-	<ul id="messages"></ul>
-	<form action="">
-		<input id="m" autocomplete="off" /><button>Send</button>
-	</form>
+    <!--chat-->
+    <form id="form-chat" action="">
+        <input type="text" id="msg" autocomplete="off" /><button>Send</button>
+    </form>
+    <ul id="messages"></ul>
 
-	<script src="/socket.io/socket.io.js"></script>
-	<script src="/msgpack.codec.js"></script>
-	<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
-	<script>
-		var obj = {
-			aaa: {
-				count: 123,
-				name: "テスト１",
-				result: false
-			},
-			bbb: {
-				count: 456,
-				name: "テスト２",
-				result: true
-			},
-			ccc: {
-				count: 789,
-				name: "テスト３",
-				param: {
-					ary: ["a", "b", "c"],
-					name: "テスト４"
-				},
-				result: true
-			}
-		};
+    <!--json file-->
+    <input type="file" id="file" />
+    <ul id="output-size"></ul>
 
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/msgpack.codec.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+        // connection 接続
+        var socket = io();
 
-		// connection 接続
-		var socket = io();
+        $('#form-chat').submit(function () {
+            // client send
+            socket.emit('chat', $('#msg').val());
+            $('#msg').val('').focus();
+            return false;
+        });
 
-		$('form').submit(function () {
-			// client send
-			//socket.emit('chat', $('#m').val());
-		    var json = JSON.stringify(obj);
-		    console.log(json);
-		    console.log(json.length);
-		    var binary = msgpack.pack(json);
-		    console.log(binary);
-		    console.log(binary.length);
-		    socket.emit('chat', binary);
-			$('#m').val('').focus();
-			return false;
-		});
+        // server push
+        socket.on('chat', function (data) {
+            $('#messages').append($('<li>').text(data));
+        });
+        socket.on('connect', function () { console.log('[connect]'); });
+        socket.on('error', function (err) { console.log('[error]' + err); });
+        socket.on('disconnect', function () { console.log('[disconnect]'); });
+        socket.on('reconnect', function (num) { console.log('[reconnect]' + num); });
+        socket.on('reconnect_attempt', function () { console.log('[reconnect_attempt]'); });
+        socket.on('reconnecting', function (num) { console.log('[reconnecting]' + num); });
+        socket.on('reconnect_error', function (err) { console.log('[reconnect_error]' + err); });
+        socket.on('reconnect_failed', function () { console.log('[reconnect_failed]'); });
 
-		$('#m').focus();
+        // json file upload
+        $('#file').change(function (ev) {
+            var fileList = ev.target.files;
+            var file = fileList[0];
+            if (!file) return;
 
-		// server push
-		socket.on('chat', function (data) {
-		    console.log(data);
-		    var unpack = msgpack.unpack(data);
-			console.log(unpack);
-			$('#messages').append($('<li>').text(unpack));
-		});
+            // 拡張子取得
+            var ft = file.name.split('.');
+            var ext = ft[ft.length - 1];
 
+            var reader = new FileReader();
+            if (ext === 'json') {
+                // jsonの場合はシリアライズ差分
+                reader.readAsText(file);
+                reader.onload = function (e) {
+                    // Text
+                    var jsonTxt = reader.result;
+                    var jsonStr = JSON.stringify(jsonTxt);
+                    var binary = msgpack.pack(jsonTxt);
+                    //console.log(jsonTxt);
+                    //console.log(jsonStr);
+                    //console.log(binary);
+                    $('#output-size').append($('<li>').text('RawData : ' + jsonTxt.length));
+                    $('#output-size').append($('<li>').text('Json : ' + jsonStr.length));
+                    $('#output-size').append($('<li>').text('Binary : ' + binary.length));
 
-		socket.on('connect', function () { console.log('[connect]'); });
-		socket.on('error', function(err) { console.log('[error]' + err); });
-		socket.on('disconnect', function () { console.log('[disconnect]'); });
-		socket.on('reconnect', function (num) { console.log('[reconnect]' + num); });
-		socket.on('reconnect_attempt', function () { console.log('[reconnect_attempt]'); });
-		socket.on('reconnecting', function (num) { console.log('[reconnecting]' + num); });
-		socket.on('reconnect_error', function (err) { console.log('[reconnect_error]' + err); });
-		socket.on('reconnect_failed', function () { console.log('[reconnect_failed]'); });
-	</script>
+                    // client send
+                    socket.emit('binary', binary);
+
+                    // server push
+                    socket.on('binary', function (data) {
+                        var unpack = msgpack.unpack(data.buffer);
+                        console.log(unpack);
+                    });
+                }
+            } else {
+                // jsonの以外はファイルサイズ
+                reader.readAsArrayBuffer(file);
+                reader.onload = function(e) {
+                    // ArrayBuffer
+                    var buffer = reader.result;
+                    var arr = new Uint8Array(buffer);
+                    $('#output-size').text('Size : ' + arr.length); 
+                }
+            }
+        });
+    </script>
 </body>
 </html>
